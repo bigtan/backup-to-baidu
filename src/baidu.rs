@@ -233,11 +233,11 @@ impl BaiduPanUploader {
             self.refresh_access_token()?;
         }
 
-        Ok(self
+        self
             .token_data
             .as_ref()
             .map(|t| t.access_token.clone())
-            .context("No access token available")?)
+            .context("No access token available")
     }
 
     /// Perform authorization flow
