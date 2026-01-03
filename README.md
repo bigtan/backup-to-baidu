@@ -26,16 +26,16 @@ app_secret = "your_app_secret"
 # baidu_config = "C:/path/to/baidu_pan_config.json"
 
 [[backups]]
-source_dir = "D:/data/project-a"
+source_dir = "/srv/data/project-a"
 remote_dir = "/backups/project-a"
 archive_name = "project-a"
 keep_archive = false
 
 [[backups]]
-command = "mysqldump -u root -pYourPass mydb > D:/backup/mysql/mydb.sql"
-source_path = "D:/backup/mysql/mydb.sql"
+command = "mysqldump -u root -pYourPass mydb > /var/backups/mysql/mydb-{date}.sql"
+source_path = "/var/backups/mysql/mydb-{date}.sql"
 keep_command_source = false
-remote_dir = "/backups/mysql"
+remote_dir = "/backups/mysql/{archive_name}/{date}"
 archive_name = "mydb"
 keep_archive = false
 ```
@@ -47,6 +47,7 @@ keep_archive = false
 - `command_workdir` sets the working directory for `command`
 - `keep_command_source` defaults to `true` and only applies when `command` is set
 - Normal file/directory backups never modify the source data
+- `command`, `command_workdir`, `source_dir`, `source_path`, and `remote_dir` support placeholders: `{date}` and `{archive_name}`
 
 ## Run
 ```bash

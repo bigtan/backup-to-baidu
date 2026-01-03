@@ -51,10 +51,17 @@ fn main() -> Result<()> {
         BaiduPanUploader::new(config.app.app_key, config.app.app_secret, baidu_config)?;
 
     for item in config.backups {
-        let source_path = resolve_source_path(&item)?;
+        let date = Local::now().format("%Y%m%d").to_string();
+        let base_name = normalize_archive_name(&item.archive_name);
+        let source_path = resolve_source_path(&item, &date, base_name)?;
         if let Some(command) = item.command.as_deref() {
-            info!("Running command: {}", command);
-            run_command(command, item.command_workdir.as_deref())?;
+            let expanded_command = expand_placeholders(command, &date, base_name);
+            info!("Running command: {}", expanded_command);
+            let workdir = item
+                .command_workdir
+                .as_deref()
+                .map(|dir| expand_placeholders(dir, &date, base_name));
+            run_command(&expanded_command, workdir.as_deref())?;
         }
 
         if !source_path.exists() {
@@ -64,15 +71,16 @@ fn main() -> Result<()> {
             anyhow::bail!("Source path is not a file or directory: {}", source_path.display());
         }
 
-        let archive_path = build_archive_path(&item.archive_name)?;
+        let archive_path = build_archive_path(base_name, &date)?;
         info!("Creating archive: {}", archive_path.display());
         create_archive(&source_path, &archive_path)?;
 
+        let remote_dir = expand_placeholders(&item.remote_dir, &date, base_name);
         uploader.upload(
             archive_path
                 .to_str()
                 .context("Archive path is not valid UTF-8")?,
-            &item.remote_dir,
+            &remote_dir,
         )?;
         if !item.keep_archive.unwrap_or(false) {
             fs::remove_file(&archive_path).with_context(|| {
@@ -108,25 +116,34 @@ fn load_config(path: &str) -> Result<Config> {
     Ok(config)
 }
 
-fn build_archive_path(archive_name: &str) -> Result<PathBuf> {
-    let date = Local::now().format("%Y%m%d").to_string();
-    let base_name = if archive_name.trim().is_empty() {
+fn normalize_archive_name(archive_name: &str) -> &str {
+    if archive_name.trim().is_empty() {
         "backup"
     } else {
         archive_name.trim()
-    };
-    let file_name = format!("{base_name}-{date}.tar.zst");
+    }
+}
+
+fn expand_placeholders(input: &str, date: &str, archive_name: &str) -> String {
+    input
+        .replace("{date}", date)
+        .replace("{archive_name}", archive_name)
+}
+
+fn build_archive_path(archive_name: &str, date: &str) -> Result<PathBuf> {
+    let file_name = format!("{archive_name}-{date}.tar.zst");
     let output_path = env::current_dir()?.join(file_name);
     Ok(output_path)
 }
 
-fn resolve_source_path(item: &BackupItem) -> Result<PathBuf> {
+fn resolve_source_path(item: &BackupItem, date: &str, archive_name: &str) -> Result<PathBuf> {
     let candidate = item
         .source_path
         .as_deref()
         .or(item.source_dir.as_deref())
         .context("Missing source_path/source_dir in backup item")?;
-    let trimmed = candidate.trim();
+    let expanded = expand_placeholders(candidate, date, archive_name);
+    let trimmed = expanded.trim();
     if trimmed.is_empty() {
         anyhow::bail!("source_path/source_dir cannot be empty");
     }
