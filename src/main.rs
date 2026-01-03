@@ -181,7 +181,7 @@ fn run_command(command: &str, workdir: Option<&str>) -> Result<()> {
 fn create_archive(source_path: &Path, output_path: &Path) -> Result<()> {
     let file = File::create(output_path)
         .with_context(|| format!("Failed to create archive file: {}", output_path.display()))?;
-    let encoder = zstd::Encoder::new(file, 19)
+    let encoder = zstd::Encoder::new(file, 10)
         .context("Failed to initialize zstd encoder")?;
     let mut builder = tar::Builder::new(encoder);
 
